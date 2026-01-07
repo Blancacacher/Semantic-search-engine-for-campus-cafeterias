@@ -135,14 +135,6 @@
 
 ---
 
-## 推荐改进（可选）
-
-- 添加 `requirements.txt` 或 `environment.yml`，列出准确依赖与版本，方便他人复现环境。
-- 添加 `LICENSE` 文件（说明开源许可），当前仓库中未显示许可文件。
-- 为关键脚本（train / infer / interactive）添加清晰的 CLI 帮助与示例配置（例如 `configs/`），并在 README 中贴出最常用的示例。
-- 如果 `index.html` 用于演示服务，可添加一个小型后端（例如 Flask 或 FastAPI）示例，以便用 JavaScript 与后端模型交互。
-
----
 
 ## 贡献（Contributing）
 
