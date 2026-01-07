@@ -1,0 +1,903 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>食堂菜品智能搜索</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f8f9fc;
+            margin: 0;
+            padding: 0;
+            color: #333;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        /* Ambient Background Blobs */
+        .blob {
+            position: fixed;
+            border-radius: 50%;
+            filter: blur(60px);
+            z-index: -1;
+            opacity: 0.5;
+            animation: floatBlob 10s infinite alternate;
+        }
+        .blob-1 {
+            width: 500px;
+            height: 500px;
+            background: #ffdee9;
+            background: linear-gradient(0deg, #ffdee9 0%, #b5fffc 100%);
+            top: -150px;
+            left: -150px;
+        }
+        .blob-2 {
+            width: 400px;
+            height: 400px;
+            background: #FFEFBA;
+            background: linear-gradient(to right, #FFFFFF, #FFEFBA);
+            bottom: -100px;
+            right: -100px;
+            animation-delay: -5s;
+        }
+        
+        @keyframes floatBlob {
+            0% { transform: translate(0, 0) rotate(0deg); }
+            100% { transform: translate(30px, 50px) rotate(10deg); }
+        }
+
+        /* Menu Button */
+        .menu-btn {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            width: 40px;
+            height: 40px;
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 50%;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 1000;
+            transition: all 0.3s ease;
+            border: 1px solid rgba(0,0,0,0.05);
+        }
+        .menu-btn:hover {
+            transform: scale(1.05);
+            background: white;
+            box-shadow: 0 6px 15px rgba(0,0,0,0.15);
+        }
+        .menu-btn svg {
+            width: 24px;
+            height: 24px;
+            fill: #2c3e50;
+        }
+
+        /* Home Button */
+        .home-btn {
+            position: fixed;
+            top: 20px;
+            left: 80px; /* 20px + 40px width + 20px gap */
+            width: 40px;
+            height: 40px;
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 50%;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 1000;
+            transition: all 0.3s ease;
+            border: 1px solid rgba(0,0,0,0.05);
+        }
+        .home-btn:hover {
+            transform: scale(1.05);
+            background: white;
+            box-shadow: 0 6px 15px rgba(0,0,0,0.15);
+        }
+        .home-btn svg {
+            width: 22px;
+            height: 22px;
+            fill: #2c3e50;
+        }
+
+        /* Sidebar Modal */
+        .sidebar-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.3);
+            z-index: 2000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(3px);
+        }
+        .sidebar {
+            position: fixed;
+            top: 0;
+            left: -420px;
+            width: 400px;
+            height: 100%;
+            background: white;
+            z-index: 2001;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 5px 0 25px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .sidebar-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+        .sidebar.active {
+            left: 0;
+        }
+        
+        .sidebar-header {
+            padding: 20px 24px;
+            border-bottom: 1px solid #f0f0f0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: relative;
+        }
+        .sidebar-header h2 {
+            margin: 0;
+            font-size: 20px;
+            color: #2c3e50;
+        }
+        .close-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: #95a5a6;
+            padding: 5px;
+            transition: color 0.3s;
+            position: absolute;
+            right: 24px;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+        .close-btn:hover {
+            color: #2c3e50;
+        }
+
+        .sidebar-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 24px;
+            /* padding-bottom removed */
+        }
+        
+        .filter-section {
+            margin-bottom: 24px;
+        }
+        .filter-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #7f8c8d;
+            margin-bottom: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .tag-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .tag {
+            padding: 6px 14px;
+            background: #f5f7fa;
+            border: 1px solid #e1e8ed;
+            border-radius: 20px;
+            font-size: 14px;
+            color: #2c3e50;
+            cursor: pointer;
+            transition: all 0.2s;
+            user-select: none;
+        }
+        .tag:hover {
+            background: #e9eef6;
+            border-color: #d0dbe5;
+        }
+        .tag.active {
+            background: #3498db;
+            color: white;
+            border-color: #3498db;
+            box-shadow: 0 2px 5px rgba(52, 152, 219, 0.3);
+        }
+
+        /* Dual Range Slider Styles */
+        .dual-slider-wrapper {
+            position: relative;
+            width: 100%;
+            height: 40px;
+            margin-top: 15px;
+        }
+        
+        .slider-track {
+            position: absolute;
+            width: 100%;
+            height: 6px;
+            top: 17px;
+            background: #e0e0e0;
+            border-radius: 3px;
+            z-index: 1;
+        }
+        
+        .slider-fill {
+            position: absolute;
+            height: 6px;
+            top: 17px;
+            background: #3498db;
+            border-radius: 3px;
+            z-index: 2;
+        }
+
+        .dual-range-input {
+            position: absolute;
+            width: 100%;
+            height: 40px;
+            top: 0;
+            pointer-events: none;
+            -webkit-appearance: none;
+            background: none;
+            z-index: 3;
+            margin: 0;
+        }
+        
+        .dual-range-input::-webkit-slider-thumb {
+            pointer-events: auto;
+            -webkit-appearance: none;
+            width: 20px;
+            height: 20px;
+            background: #3498db;
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+            margin-top: 0px; /* Aligns with track usually */
+        }
+        
+        .price-labels {
+            display: flex;
+            justify-content: space-between;
+            margin-top: -5px;
+            font-size: 13px;
+            color: #7f8c8d;
+        }
+        
+        .checkbox-wrapper {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+            cursor: pointer;
+        }
+        .checkbox-wrapper input {
+            margin-right: 8px;
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+        }
+        .checkbox-wrapper label {
+            font-size: 14px;
+            color: #2c3e50;
+            cursor: pointer;
+            user-select: none;
+        }
+        
+        .price-inputs-manual {
+             display: flex;
+             justify-content: space-between;
+             align-items: center;
+             margin-bottom: 10px;
+        }
+        .price-inputs-manual input {
+            width: 80px;
+            padding: 6px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        .sidebar-footer {
+            /* Flex item, natural flow */
+            position: relative;
+            z-index: 10;
+            /* padding: 30px 80px 30px 10px; */
+            padding: 30px 24px;
+            border-top: 1px solid #f0f0f0;
+            background: #fcfcfc;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-shrink: 0;
+        }
+        .confirm-btn {
+            width: 92.5%;
+            padding: 14px;
+            background: #2c3e50;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        .confirm-btn:hover {
+            background: #34495e;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 35vh auto 0; /* Initially centered vertically */
+            padding: 20px;
+            text-align: left; /* Left align text */
+            transition: margin-top 0.6s cubic-bezier(0.22, 1, 0.36, 1); /* Smooth transition */
+            width: 100%;
+            box-sizing: border-box;
+        }
+        /* Center the search box vertically, accounting for title height (~120px) + half box height */
+        .container:not(.searched) {
+            margin-top: calc(50vh - 150px);
+        }
+        .container.searched {
+            margin-top: 50px;
+        }
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 30px;
+            margin-top: 0;
+            margin-left: 15px; /* Slight indent */
+            transition: all 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+            max-height: 200px;
+            opacity: 1;
+        }
+        .container.searched h1 {
+            animation: none;
+            opacity: 0;
+            max-height: 0;
+            margin-bottom: 0;
+            pointer-events: none;
+        }
+        .search-box {
+            display: flex;
+            justify-content: flex-start; /* Left align */
+            margin-bottom: 30px;
+            gap: 10px;
+            position: relative;
+        }
+        input[type="text"] {
+            width: 100%;
+            padding: 20px 60px 20px 30px;
+            font-size: 18px;
+            border: none;
+            border-radius: 40px;
+            background-color: rgba(255, 255, 255, 0.8); /* Semi-transparent */
+            backdrop-filter: blur(5px);
+            outline: none;
+            transition: all 0.3s;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.04); /* Softer shadow */
+        }
+        input[type="text"]:focus {
+            background-color: #fff;
+            box-shadow: 0 8px 25px rgba(52, 152, 219, 0.25);
+        }
+        /* Hidden button trigger area but keeping functionality */
+        button {
+            position: absolute;
+            right: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 40px;
+            height: 40px;
+            padding: 0;
+            background: transparent;
+            color: #7f8c8d;
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: color 0.3s, background-color 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        button:hover {
+            color: #3498db;
+            background-color: rgba(52, 152, 219, 0.1);
+        }
+        button svg {
+            width: 20px;
+            height: 20px;
+            fill: currentColor;
+        }
+        button:disabled {
+            color: #bdc3c7;
+            background-color: transparent;
+            cursor: not-allowed;
+        }
+        #results {
+            text-align: left;
+        }
+        .result-card {
+            background: rgba(255, 255, 255, 0.9); /* Slightly transparent */
+            backdrop-filter: blur(10px);
+            padding: 24px;
+            margin-bottom: 20px;
+            border-radius: 16px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.03);
+            transition: all 0.3s ease;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            overflow: hidden;
+            border: 1px solid rgba(255,255,255,0.8);
+            border-left: 5px solid #3498db; /* Accent border */
+        }
+        .result-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 15px 30px rgba(0,0,0,0.08);
+            border-color: rgba(255,255,255,0.9);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 12px;
+        }
+        .dish-name {
+            font-size: 24px;
+            font-weight: 600;
+            color: #1a1a1a;
+            margin: 0;
+            line-height: 1.3;
+            letter-spacing: -0.02em;
+            display: inline-block;
+        }
+        .dish-price {
+            background-color: #fff0f0;
+            color: #e74c3c;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 14px;
+            white-space: nowrap;
+            margin-left: 10px;
+            border: 1px solid #ffdbdb;
+        }
+        .dish-desc {
+            color: #5d6d7e;
+            font-size: 15px;
+            line-height: 1.6;
+            margin-bottom: 16px;
+            flex-grow: 1;
+        }
+        .dish-footer {
+            display: flex;
+            align-items: center;
+            padding-top: 16px;
+            border-top: 1px solid #f5f7fa;
+            color: #7f8c8d;
+            font-size: 13px;
+        }
+        .location-icon {
+            margin-right: 6px;
+            font-size: 16px;
+        }
+        .location-text {
+            font-weight: 500;
+        }
+        .loading {
+            display: none;
+            color: #7f8c8d;
+            margin-top: 20px;
+        }
+        .no-results {
+            color: #7f8c8d;
+            margin-top: 20px;
+        }
+        .error {
+            color: #e74c3c;
+            margin-top: 20px;
+        }
+
+        /* Animation Keyframes */
+        @keyframes floatUp {
+            from {
+                opacity: 0;
+                transform: translateY(40px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .animate-title {
+            animation: floatUp 0.8s ease-out forwards;
+            background: linear-gradient(120deg, #2c3e50, #3498db);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        /* School Logo */
+        .school-logo {
+            position: fixed;
+            top: 25px;
+            right: 30px;
+            width: 60px;
+            height: auto;
+            z-index: 900;
+            opacity: 0.8;
+            transition: opacity 0.3s;
+        }
+        .school-logo:hover {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+
+    <img src="/static/ruc_logo.png" class="school-logo" alt="RUC Logo">
+
+    <!-- Menu Button -->
+    <div class="menu-btn" onclick="toggleSidebar()">
+        <svg viewBox="0 0 24 24">
+            <path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/>
+        </svg>
+    </div>
+
+    <!-- Home Button -->
+    <div class="home-btn" onclick="window.location.reload()">
+        <svg viewBox="0 0 24 24">
+            <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
+        </svg>
+    </div>
+
+    <!-- Sidebar Modal -->
+    <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <h2>快速筛选</h2>
+            <button class="close-btn" onclick="toggleSidebar()">
+                <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+            </button>
+        </div>
+        
+        <div class="sidebar-content">
+            <div class="filter-section">
+                <div class="filter-title">📍 地点</div>
+                <div class="tag-group" id="locationTags">
+                    <div class="tag" onclick="toggleTag(this)">是饭餐厅</div>
+                    <div class="tag" onclick="toggleTag(this)">东区食堂一楼</div>
+                    <div class="tag" onclick="toggleTag(this)">东区食堂二楼</div>
+                    <div class="tag" onclick="toggleTag(this)">中区食堂二楼</div>
+                    <div class="tag" onclick="toggleTag(this)">西区食堂一楼</div>
+                    <div class="tag" onclick="toggleTag(this)">北区食堂一楼</div>
+                    <div class="tag" onclick="toggleTag(this)">北区食堂二楼</div>
+                    <div class="tag" onclick="toggleTag(this)">北区食堂三楼</div>
+                </div>
+            </div>
+
+            <div class="filter-section">
+                <div class="filter-title">🥘 口味</div>
+                <div class="tag-group">
+                    <div class="tag" onclick="toggleTag(this)">辣</div>
+                    <div class="tag" onclick="toggleTag(this)">甜</div>
+                    <div class="tag" onclick="toggleTag(this)">咸</div>
+                    <div class="tag" onclick="toggleTag(this)">酸</div>
+                    <div class="tag" onclick="toggleTag(this)">清淡</div>
+                    <div class="tag" onclick="toggleTag(this)">重口味</div>
+                </div>
+            </div>
+
+            <div class="filter-section">
+                <div class="filter-title">🍲 菜系/种类</div>
+                <div class="tag-group">
+                    <div class="tag" onclick="toggleTag(this)">川菜</div>
+                    <div class="tag" onclick="toggleTag(this)">粤菜</div>
+                    <div class="tag" onclick="toggleTag(this)">面食</div>
+                    <div class="tag" onclick="toggleTag(this)">米粉</div>
+                    <div class="tag" onclick="toggleTag(this)">小吃</div>
+                    <div class="tag" onclick="toggleTag(this)">自选</div>
+                    <div class="tag" onclick="toggleTag(this)">套餐</div>
+                    <div class="tag" onclick="toggleTag(this)">清真</div>
+                </div>
+            </div>
+
+            <div class="filter-section">
+                <div class="filter-title">💰 价格预算 (元)</div>
+                <div class="price-range-container">
+                    
+                    <div class="checkbox-wrapper">
+                        <input type="checkbox" id="priceEnabled" onchange="togglePrice(this)">
+                        <label for="priceEnabled">启用价格筛选</label>
+                    </div>
+
+                    <div id="priceControls" style="opacity: 0.5; pointer-events: none; transition: opacity 0.3s;">
+                        <div class="price-inputs-manual">
+                             <span id="labelMin">¥ 0</span>
+                             <span id="labelMax">¥ 50</span>
+                        </div>
+                        
+                        <div class="dual-slider-wrapper">
+                            <div class="slider-track"></div>
+                            <div class="slider-fill" id="sliderFill" style="left: 0%; width: 100%;"></div>
+                            <input type="range" min="0" max="50" value="0" class="dual-range-input" id="rangeMin" oninput="updateDualSlider()">
+                            <input type="range" min="0" max="50" value="50" class="dual-range-input" id="rangeMax" oninput="updateDualSlider()">
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+        <div class="sidebar-footer">
+            <button class="confirm-btn" onclick="applyFilters()">确定</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <h1 class="animate-title">Hi，<br>今天想吃点什么？</h1>
+        
+        <div class="search-box">
+            <input type="text" id="searchInput" placeholder="你想吃什么？例如：红烧肉..." onkeypress="handleKeyPress(event)">
+            <button id="searchBtn" onclick="performSearch()">
+                <svg viewBox="0 0 24 24">
+                    <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+                </svg>
+            </button>
+        </div>
+
+        <div id="loading" class="loading">正在搜索美味佳肴...</div>
+        <div id="error" class="error"></div>
+        <div id="results"></div>
+    </div>
+
+    <script>
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebarOverlay');
+            sidebar.classList.toggle('active');
+            overlay.classList.toggle('active');
+        }
+
+        function toggleTag(element) {
+            element.classList.toggle('active');
+        }
+
+        function togglePrice(checkbox) {
+            const controls = document.getElementById('priceControls');
+            if (checkbox.checked) {
+                controls.style.opacity = '1';
+                controls.style.pointerEvents = 'auto';
+            } else {
+                controls.style.opacity = '0.5';
+                controls.style.pointerEvents = 'none';
+            }
+        }
+
+        function updateDualSlider() {
+            const minSlider = document.getElementById('rangeMin');
+            const maxSlider = document.getElementById('rangeMax');
+            const fill = document.getElementById('sliderFill');
+            const labelMin = document.getElementById('labelMin');
+            const labelMax = document.getElementById('labelMax');
+            
+            let minVal = parseInt(minSlider.value);
+            let maxVal = parseInt(maxSlider.value);
+            
+            // Prevent crossing
+            if (minVal > maxVal) {
+                const tmp = minVal;
+                minVal = maxVal;
+                maxVal = tmp;
+            }
+            
+            const range = 50; // max - min
+            const left = (minVal / range) * 100;
+            const width = ((maxVal - minVal) / range) * 100;
+            
+            fill.style.left = left + '%';
+            fill.style.width = width + '%';
+            
+            labelMin.textContent = '¥ ' + minVal;
+            labelMax.textContent = '¥ ' + maxVal;
+        }
+
+        function applyFilters() {
+            // Collect all active tags
+            const activeTags = Array.from(document.querySelectorAll('.tag.active')).map(el => el.textContent);
+            
+            // Construct query
+            let queryParts = [...activeTags];
+            
+            // Add price range only if enabled
+            const priceEnabled = document.getElementById('priceEnabled').checked;
+            if (priceEnabled) {
+                const minSlider = document.getElementById('rangeMin');
+                const maxSlider = document.getElementById('rangeMax');
+                let minVal = parseInt(minSlider.value);
+                let maxVal = parseInt(maxSlider.value);
+                
+                // Ensure correct order
+                if (minVal > maxVal) {
+                    const t = minVal; minVal = maxVal; maxVal = t;
+                }
+                
+                queryParts.push(`价格${minVal}到${maxVal}元`);
+            }
+
+            if (queryParts.length > 0) {
+                const query = queryParts.join(' ');
+                document.getElementById('searchInput').value = query;
+                toggleSidebar(); // Close sidebar
+                performSearch(); // Trigger search
+            } else {
+                toggleSidebar();
+            }
+        }
+
+        function handleKeyPress(event) {
+            if (event.key === 'Enter') {
+                performSearch();
+            }
+        }
+
+        async function performSearch() {
+            const query = document.getElementById('searchInput').value.trim();
+            const resultsDiv = document.getElementById('results');
+            const loadingDiv = document.getElementById('loading');
+            const errorDiv = document.getElementById('error');
+            const searchBtn = document.getElementById('searchBtn');
+            const container = document.querySelector('.container');
+
+            if (!query) return;
+
+            // Move container up
+            container.classList.add('searched');
+
+            // Reset UI
+            resultsDiv.innerHTML = '';
+            errorDiv.textContent = '';
+            loadingDiv.style.display = 'block';
+            searchBtn.disabled = true;
+
+            try {
+                const response = await fetch('/search', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ query: query })
+                });
+
+                const data = await response.json();
+
+                if (data.code === 200) {
+                    displayResults(data.data);
+                } else {
+                    errorDiv.textContent = '搜索出错: ' + data.message;
+                }
+            } catch (err) {
+                errorDiv.textContent = '请求失败，请检查网络连接';
+                console.error(err);
+            } finally {
+                loadingDiv.style.display = 'none';
+                searchBtn.disabled = false;
+            }
+        }
+
+        function displayResults(items) {
+            const resultsDiv = document.getElementById('results');
+            
+            if (!items || items.length === 0) {
+                resultsDiv.innerHTML = '<div class="no-results">没有找到相关菜品，换个词试试？</div>';
+                return;
+            }
+
+            items.forEach(item => {
+                const parsed = parseDishContent(item.content, item.location);
+                
+                const card = document.createElement('div');
+                card.className = 'result-card';
+                
+                let priceHtml = parsed.price ? `<div class="dish-price">¥ ${escapeHtml(parsed.price)}</div>` : '';
+                
+                card.innerHTML = `
+                    <div class="card-header">
+                        <div class="dish-name">${escapeHtml(parsed.name)}</div>
+                        ${priceHtml}
+                    </div>
+                    <div class="dish-desc">${escapeHtml(parsed.description)}</div>
+                    <div class="dish-footer">
+                        <span class="location-icon">📍</span>
+                        <span class="location-text">${escapeHtml(parsed.location)}</span>
+                    </div>
+                `;
+                resultsDiv.appendChild(card);
+            });
+        }
+
+        function parseDishContent(content, rawLocation) {
+            // Default fallback
+            let name = content;
+            let description = '暂无描述';
+            let price = '';
+            let location = rawLocation;
+
+            try {
+                // Heuristic parsing based on: "Name, Description..., 价格Price, 位于Location"
+                // Split by Chinese comma or regular comma
+                let segments = content.split(/，|,|。/).map(s => s.trim()).filter(s => s);
+
+                if (segments.length > 0) {
+                    // Assume first part is name
+                    name = segments[0];
+                    segments.shift();
+
+                    let descParts = [];
+                    
+                    segments.forEach(seg => {
+                        if (seg.startsWith('价格')) {
+                            // Extract price number/unit
+                            price = seg.replace('价格', '').trim();
+                        } else if (seg.startsWith('位于')) {
+                            // If content has location, use it as it might be more descriptive than rawLocation
+                            // But usually we can stick to rawLocation or prefer this one. 
+                            // Let's use this one if available and not empty
+                            let loc = seg.replace('位于', '').trim();
+                            // Fix "是" prefix issue, but exception for "是饭餐厅"
+                            if (loc.startsWith('是') && !loc.startsWith('是饭餐厅')) {
+                                loc = loc.substring(1);
+                            }
+                            if (loc) location = loc;
+                        } else {
+                            descParts.push(seg);
+                        }
+                    });
+
+                    if (descParts.length > 0) {
+                        description = descParts.join('，');
+                    }
+                }
+            } catch (e) {
+                console.error("Error parsing content", e);
+            }
+
+            // Fallback location fix if parsing didn't catch it or used rawLocation
+            if (location && location.startsWith('是') && !location.startsWith('是饭餐厅')) {
+                location = location.substring(1);
+            }
+
+            return { name, description, price, location };
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>
