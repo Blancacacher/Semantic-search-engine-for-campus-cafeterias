@@ -1,0 +1,9 @@
+numpy
+torch>=1.12
+transformers>=4.0.0
+scikit-learn
+faiss-cpu
+flask
+sentence-transformers
+tqdm
+pyyaml
